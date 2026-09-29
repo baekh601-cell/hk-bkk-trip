@@ -1169,5 +1169,7 @@ updateClockBadge();
 setInterval(updateClockBadge, 30000);
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { /* 오프라인 캐시 없이도 동작 */ }));
+  // 잠금 해제를 기다리는 동안 load 이벤트가 이미 지나갔을 수 있어요
+  const registerSW = () => navigator.serviceWorker.register('sw.js').catch(() => { /* 오프라인 캐시 없이도 동작 */ });
+  if (document.readyState === 'complete') registerSW(); else addEventListener('load', registerSW);
 }
