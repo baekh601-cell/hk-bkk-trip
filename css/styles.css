@@ -615,6 +615,68 @@ html, body { overflow-x: clip; }
 .ev.flash .ev-card { animation: flash 1.6s var(--ease-out); }
 @keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--kc), var(--shadow-2); } 100% { box-shadow: var(--shadow-1); } }
 
+/* 카드 머리: 종류 + 소요시간 */
+.ev-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-dur { font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 이동 연결 줄 (Wanderlog식) */
+.ev-transit { padding: 2px 0; }
+.ev-transit::before {
+  content: ""; position: absolute; left: 58px; top: 0; bottom: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--bg) 0 4px, transparent 4px 9px);
+}
+.ev-transit .ev-time { padding-top: 11px; }
+.ev-transit .ev-time b { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.ev-transit .ev-dot { top: 16px; left: 55px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--kc); background: var(--bg); }
+.ev-transit .ev-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 8px; border-radius: 14px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--line);
+}
+.tr-icon { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none; font-size: 16px; color: var(--kc); background: color-mix(in srgb, var(--kc) 13%, transparent); }
+.tr-body { min-width: 0; flex: 1; display: grid; }
+.tr-body strong { font-size: 13.5px; font-weight: 700; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-body span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tr-tip { color: #c98a00; font-size: 15px; display: grid; }
+.tr-go { color: var(--line-2); font-size: 15px; display: grid; }
+.now-flag.inline { position: static; flex: none; }
+.ev-transit.is-now .ev-card { box-shadow: 0 0 0 2px var(--hk); }
+@media (hover: hover) { .ev-transit .ev-card:hover { background: var(--surface); } }
+
+/* 하루 요약·진행 (Airbnb Trips식) */
+.day-sum { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; animation: fadeUp .8s .34s var(--ease-out) both; }
+.sum-item { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.sum-item svg { font-size: 14px; opacity: .9; }
+.day-progress { margin-top: 14px; max-width: 360px; animation: fadeUp .8s .4s var(--ease-out) both; }
+.day-progress .bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,.22); overflow: hidden; }
+.day-progress .bar span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffd27a, #ff9a8b); transition: width 1s var(--ease-out); }
+.day-progress small { display: block; margin-top: 6px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.85); }
+
+/* 탑승권 (Flighty식) */
+.pass .top { display: flex; align-items: center; gap: 8px; }
+.pass .top .flight-no { height: 24px; padding: 0 9px; border-radius: 7px; display: inline-flex; align-items: center; background: var(--ink); color: var(--bg); font-weight: 800; letter-spacing: .04em; }
+.pass .top .date { margin-left: auto; }
+.fl-row { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 12px; margin-top: 14px; }
+.fl-end { display: grid; }
+.fl-end.r { text-align: right; }
+.fl-time { font-family: var(--display); font-size: clamp(30px, 9vw, 42px); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.fl-code { font-size: 15px; font-weight: 800; letter-spacing: .06em; margin-top: 6px; }
+.fl-end small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.fl-track { display: grid; justify-items: center; gap: 4px; padding-bottom: 26px; min-width: 0; }
+.fl-dur { font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.fl-line { display: flex; align-items: center; gap: 6px; width: 100%; color: var(--ink); }
+.fl-line i { flex: 1; height: 2px; background: repeating-linear-gradient(90deg, var(--line-2) 0 5px, transparent 5px 9px); }
+.fl-line svg { font-size: 20px; }
+
+/* 시간대 머리: 유리 느낌 */
+.period-head { background: color-mix(in srgb, var(--bg) 80%, transparent); -webkit-backdrop-filter: saturate(1.5) blur(14px); backdrop-filter: saturate(1.5) blur(14px); margin: 0 calc(-1 * var(--gutter)); padding-left: var(--gutter); padding-right: var(--gutter); }
+@media (min-width: 840px) { .period-head { margin: 0; padding-left: 0; padding-right: 0; } }
+@media (max-width: 379px) {
+  .ev-transit::before { left: 50px; }
+  .ev-transit .ev-dot { left: 47px; }
+  .fl-row { gap: 8px; }
+}
+
 .k-food { --kc: var(--k-food); } .k-rest { --kc: var(--k-rest); } .k-move { --kc: var(--k-move); }
 .k-visit { --kc: var(--k-visit); } .k-flight { --kc: var(--k-flight); } .k-special { --kc: var(--k-special); }
 

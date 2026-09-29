@@ -366,7 +366,7 @@ function flightPin(f, i) {
       <div class="codes"><b>${f.from}</b>${icon('plane')}<b class="to">${f.to}</b></div>
       <div class="times"><span>${f.dep} ${esc(f.fromCity)}</span><span>${f.arr} ${esc(f.toCity)}</span></div>
       <div class="perf"></div>
-      <div class="foot"><span>${esc(f.date)}</span><b>${f.day}일차</b></div>
+      <div class="foot"><span>${esc(f.date)} · ${durLabel(flightMinutes(f))}</span><b>${f.day}일차</b></div>
     </a>
   </div>`;
 }
@@ -558,10 +558,34 @@ function timeLabel(e) {
   return e.k === 'flight' && toMin(e.e) - toMin(e.s) > 60 ? `${e.s} → ${e.e}` : `${e.s} – ${e.e}`;
 }
 
+const durLabel = (m) => (m < 60 ? `${m}분` : m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`);
+const TZ = { ICN: 9, HKG: 8, BKK: 7 };
+/* 출발·도착 공항의 시차를 반영한 실제 비행시간 */
+const flightMinutes = (f) => ((toMin(f.arr) - TZ[f.to] * 60) - (toMin(f.dep) - TZ[f.from] * 60) + 1440) % 1440;
+
+/* 사진 없는 이동은 타임라인을 잇는 얇은 연결 줄로 보여요 */
+function renderTransit(e, status, hidden) {
+  const k = KIND[e.k];
+  const mins = toMin(e.e) - toMin(e.s);
+  return `<li class="ev ev-transit k-${e.k} ${status} ${hidden}" data-i="${e.i}" data-s="${e.s}" ${e.br ? `data-br="${e.br}"` : ''}>
+    <div class="ev-time"><b>${e.s}</b></div>
+    <span class="ev-dot" aria-hidden="true"></span>
+    <div class="ev-card pressable" role="button" tabindex="0" data-ev="${e.i}" aria-label="${esc(`${e.s} ${e.t} 자세히 보기`)}">
+      <span class="tr-icon">${icon(k.icon)}</span>
+      <span class="tr-body"><strong>${esc(e.t)}</strong><span>${mins > 0 ? `${durLabel(mins)}` : ''}${e.st ? ` · ${esc(e.st)}` : ''}</span></span>
+      ${status === 'is-now' ? '<span class="now-flag inline">지금</span>' : ''}
+      ${e.tt ? `<span class="tr-tip" aria-label="현장 팁 있음">${icon('bulb')}</span>` : ''}
+      <span class="tr-go">${icon('right')}</span>
+    </div>
+  </li>`;
+}
+
 function renderEvent(e, d, state) {
   const k = KIND[e.k];
   const status = state.nowIdx.includes(e.i) ? 'is-now' : state.past.has(e.i) ? 'is-past' : '';
   const hidden = e.br && branchFilter !== 'all' && e.br !== branchFilter ? 'is-hidden' : '';
+  if (e.k === 'move' && !e.img) return renderTransit(e, status, hidden);
+  const mins = toMin(e.e) - toMin(e.s);
   const tags = [
     e.br ? `<span class="tag-s branch-${e.br}">${esc(BRANCH[e.br].label)}</span>` : '',
     e.st ? `<span class="tag-s status">${esc(e.st)}</span>` : '',
@@ -575,7 +599,7 @@ function renderEvent(e, d, state) {
       ${status === 'is-now' ? '<span class="now-flag">지금</span>' : ''}
       ${e.img ? photo(e.img, { city: d.city }) : ''}
       <div class="in">
-        <span class="ev-kind">${icon(k.icon)} ${k.label}</span>
+        <div class="ev-head"><span class="ev-kind">${icon(k.icon)} ${k.label}</span>${e.k !== 'flight' && mins > 0 ? `<span class="ev-dur">${durLabel(mins)}</span>` : ''}</div>
         <h4 class="ev-title">${esc(e.t)}</h4>
         ${e.d ? `<p class="ev-desc">${esc(e.d)}</p>` : ''}
         ${tags ? `<div class="ev-tags">${tags}</div>` : ''}
@@ -622,6 +646,14 @@ function renderDay(n) {
 
   const nowChip = isToday && state.nowIdx.length ? `<button class="btn small light" type="button" data-jump-now style="margin-top:14px">${icon('clock')} 지금 일정으로</button>` : '';
 
+  // 하루 요약: 종류별 개수, 여행 중이면 진행 막대
+  const count = (kk) => evs.filter((e) => e.k === kk && (!e.br || e.br !== 'dry')).length;
+  const summary = [
+    ['visit', count('visit') + count('special')], ['food', count('food')], ['move', count('move') + count('flight')], ['rest', count('rest')],
+  ].filter(([, c]) => c > 0).map(([kk, c]) => `<span class="sum-item">${icon(KIND[kk].icon)}${KIND[kk].label} ${c}</span>`).join('');
+  const donePct = isToday ? Math.round((state.past.size / evs.length) * 100) : 0;
+  const progress = isToday ? `<div class="day-progress" role="progressbar" aria-valuenow="${donePct}" aria-valuemin="0" aria-valuemax="100" aria-label="오늘 진행"><div class="bar"><span style="width:${donePct}%"></span></div><small>오늘 ${state.past.size}/${evs.length} 완료</small></div>` : '';
+
   const ovIcons = ['bulb', 'swap', 'rest', 'star', 'alert'];
   const ovLabels = ['', '', '쉬어 가는 방법', '가족과 함께', '계획이 바뀌면'];
 
@@ -640,6 +672,8 @@ function renderDay(n) {
       <div class="kicker"><span class="chip glass">${esc(CITY[d.city].en)}</span><span class="chip glass">${fmtDate(d.date, d.dow)}</span><span class="chip glass">${esc(d.route)}</span></div>
       <h1><span class="sr-only">${n}일차 · </span>${esc(d.title)}</h1>
       <p class="loc">${esc(d.location)}</p>
+      <div class="day-sum">${summary}</div>
+      ${progress}
       ${nowChip}
     </div>
     ${cover ? `<span class="credit">사진 ${esc(cover.by)} · ${esc(cover.lic)}</span>` : ''}
@@ -766,13 +800,13 @@ function renderStay() {
     <article class="pass reveal" style="--d:${i * 0.06}s">
       ${photo(f.img, { city: f.to === 'HKG' ? 'hk' : f.to === 'BKK' ? 'bkk' : 'seoul' })}
       <div class="body">
-        <div class="top"><span>${esc(f.air)} · ${f.no}</span><span>${esc(f.date)}</span></div>
-        <div class="route">
-          <div><b>${f.from}</b><small>${esc(f.fromCity)}</small></div>
-          <div class="mid">${icon('plane')}<span>${f.day}일차</span></div>
-          <div class="r"><b>${f.to}</b><small>${esc(f.toCity)}</small></div>
+        <div class="top"><span class="flight-no">${f.no}</span><span>${esc(f.air)}</span><span class="date">${esc(f.date)} · ${f.day}일차</span></div>
+        <div class="fl-row">
+          <div class="fl-end"><b class="fl-time">${f.dep}</b><span class="fl-code">${f.from}</span><small>${esc(f.fromCity)}</small></div>
+          <div class="fl-track" aria-hidden="true"><span class="fl-dur">${durLabel(flightMinutes(f))}</span><span class="fl-line"><i></i>${icon('plane')}<i></i></span></div>
+          <div class="fl-end r"><b class="fl-time">${f.arr}</b><span class="fl-code">${f.to}</span><small>${esc(f.toCity)}</small></div>
         </div>
-        <div class="times"><span>${f.dep}</span><span>${f.arr}</span></div>
+        <p class="sr-only">비행시간 ${durLabel(flightMinutes(f))}</p>
         <p class="note">${esc(f.note)}</p>
         <div class="actions"><a class="btn small ghost" href="#/day/${f.day}">${icon('cal')} ${f.day}일차 일정 보기</a></div>
       </div>
