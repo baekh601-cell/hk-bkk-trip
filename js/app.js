@@ -681,7 +681,7 @@ function renderDay(n) {
             <ul class="points">${hotel.points.map((p) => `<li>${icon('check')}<span>${esc(p)}</span></li>`).join('')}</ul>
             <div class="actions">
               <a class="btn small" href="${mapUrl(hotel.map)}" target="_blank" rel="noopener">${icon('pin')} 지도</a>
-              <button class="btn small ghost" type="button" data-copy="${esc(`${hotel.en}\n${hotel.local}\n${hotel.addr}`)}">${icon('copy')} 주소 복사</button>
+              <button class="btn small ghost" type="button" data-copy="${esc(`${hotel.local}\n${hotel.localAddr}\n${hotel.en}\n${hotel.addr}`)}">${icon('copy')} 주소 복사</button>
             </div>
           </div>` : `<div class="card reveal"><div class="card-title">${icon('bed')}<h3>오늘 밤</h3></div><p style="font-size:14px;color:var(--ink-2)">${esc(d.nightNote || '')}</p></div>`}
 
@@ -692,11 +692,7 @@ function renderDay(n) {
             <p class="sub-h">예약·발권 확인</p>
             <ul class="checks">${d.checks.map((x, i) => checkItem(`d${d.n}-${i}`, x)).join('')}</ul>
             <p class="sub-h">필요할 때 보여주세요</p>
-            <div class="phrase">
-              <p class="en" lang="en">${esc(d.phrase.en)}</p>
-              <p class="ko">${esc(d.phrase.ko)}</p>
-              <div class="row"><button class="btn small ghost" type="button" data-big="${esc(d.phrase.en)}" data-big-sub="${esc(d.phrase.ko)}">크게 보기</button>&nbsp;<button class="btn small ghost" type="button" data-copy="${esc(d.phrase.en)}">${icon('copy')} 복사</button></div>
-            </div>
+            ${phraseHTML(d.phrase)}
             <p class="sub-h">하루를 마칠 때</p>
             <p style="font-size:14px;color:var(--ink-2)">${esc(d.end)}</p>
           </div>
@@ -789,13 +785,13 @@ function renderStay() {
         <span class="chip ${h.city}">${icon('cal')} ${esc(h.stay)}</span>
         <h3>${esc(h.name)}</h3>
         <div class="en">${esc(h.en)} · ${esc(h.area)}</div>
-        <div class="addr"><div class="local">${esc(h.local)}</div><div class="line">${esc(h.addr)}</div></div>
+        <div class="addr"><div class="local" lang="${h.city === 'hk' ? 'zh-HK' : 'th'}">${esc(h.local)}</div><div class="line" lang="${h.city === 'hk' ? 'zh-HK' : 'th'}">${esc(h.localAddr)}</div><div class="line">${esc(h.addr)}</div></div>
         <p style="margin-top:12px;font-size:14px;color:var(--ink-2)">${esc(h.desc)}</p>
         <ul class="points">${h.points.map((p) => `<li>${icon('check')}<span>${esc(p)}</span></li>`).join('')}</ul>
         <div class="actions">
           <a class="btn small" href="${mapUrl(h.map)}" target="_blank" rel="noopener">${icon('pin')} 지도</a>
-          <button class="btn small ghost" type="button" data-copy="${esc(`${h.en}\n${h.local}\n${h.addr}`)}">${icon('copy')} 주소 복사</button>
-          <button class="btn small ghost" type="button" data-big="${esc(h.local)}" data-big-sub="${esc(`${h.en}\n${h.addr}`)}">기사님께 보여주기</button>
+          <button class="btn small ghost" type="button" data-copy="${esc(`${h.local}\n${h.localAddr}\n${h.en}\n${h.addr}`)}">${icon('copy')} 주소 복사</button>
+          <button class="btn small ghost" type="button" data-big="${esc(`${h.local}\n${h.localAddr}`)}" data-big-lang="${h.city === 'hk' ? 'zh-HK' : 'th'}" data-big-sub="${esc(`${h.en}\n${h.addr}`)}">기사님께 보여주기</button>
           <a class="btn small ghost" href="${h.site}" target="_blank" rel="noopener">${icon('ext')} 호텔 안내</a>
         </div>
       </div>
@@ -817,7 +813,7 @@ addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredIns
 
 function renderTools() {
   const phrases = [
-    ...TRIP.phrases.map((p) => ({ ...p, label: '식당에서' })),
+    ...TRIP.phrases,
     ...DAYS.map((d) => ({ ...d.phrase, label: `${d.n}일차 · ${d.title}` })),
   ];
   return `<div class="wrap">
@@ -852,11 +848,7 @@ function renderTools() {
       <div class="card reveal" style="grid-column:1/-1">
         <div class="card-title">${icon('chat')}<h3>현지에서 보여주세요</h3></div>
         <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))">
-          ${phrases.map((p) => `<div class="phrase">
-            <p class="eyebrow" style="letter-spacing:.04em;text-transform:none;margin-bottom:6px">${esc(p.label)}</p>
-            <p class="en" lang="en">${esc(p.en)}</p><p class="ko">${esc(p.ko)}</p>
-            <div class="row"><button class="btn small ghost" type="button" data-big="${esc(p.en)}" data-big-sub="${esc(p.ko)}">크게 보기</button>&nbsp;<button class="btn small ghost" type="button" data-copy="${esc(p.en)}">${icon('copy')} 복사</button></div>
-          </div>`).join('')}
+          ${phrases.map((p) => phraseHTML(p, p.label)).join('')}
         </div>
       </div>
 
@@ -980,9 +972,25 @@ function photoSheet(key) {
   </div>`);
 }
 
-function bigSheet(text, sub) {
+const LANG_LABEL = { 'zh-HK': '中文(香港) · 홍콩', th: 'ภาษาไทย · 태국어', ko: '한국어', en: 'English' };
+
+/* 현지에서 보여줄 문장: 현지어를 크게, 영어·한국어 뜻은 작게 */
+function phraseHTML(p, label = '') {
+  const sub = [p.lang === 'en' ? '' : p.en, p.lang === 'ko' ? '' : p.ko].filter(Boolean).join('\n');
+  return `<div class="phrase">
+    ${label ? `<p class="eyebrow" style="letter-spacing:.04em;text-transform:none;margin-bottom:6px">${esc(label)}</p>` : ''}
+    <p class="lang-tag">${esc(LANG_LABEL[p.lang] || '')}</p>
+    <p class="local" lang="${p.lang}">${esc(p.local)}</p>
+    ${p.lang !== 'en' ? `<p class="en" lang="en">${esc(p.en)}</p>` : ''}
+    ${p.lang !== 'ko' ? `<p class="ko">${esc(p.ko)}</p>` : ''}
+    <div class="row"><button class="btn small ghost" type="button" data-big="${esc(p.local)}" data-big-lang="${p.lang}" data-big-sub="${esc(sub)}">크게 보기</button>&nbsp;<button class="btn small ghost" type="button" data-copy="${esc(p.local)}">${icon('copy')} 복사</button></div>
+  </div>`;
+}
+
+function bigSheet(text, sub, lang = '') {
   openSheet(`<div style="padding:40px 4px 10px">
-    <p id="sheetTitle" style="font-size:clamp(28px,8vw,44px);font-weight:800;line-height:1.3;letter-spacing:-.02em">${esc(text)}</p>
+    ${lang && LANG_LABEL[lang] ? `<p class="lang-tag">${esc(LANG_LABEL[lang])}</p>` : ''}
+    <p id="sheetTitle" ${lang ? `lang="${lang}"` : ''} style="font-size:clamp(28px,8vw,44px);font-weight:800;line-height:1.35;letter-spacing:-.01em;white-space:pre-line">${esc(text)}</p>
     ${sub ? `<p style="margin-top:18px;font-size:17px;color:var(--muted);white-space:pre-line">${esc(sub)}</p>` : ''}
     <div class="actions" style="margin-top:24px"><button class="btn" type="button" data-copy="${esc(text)}">${icon('copy')} 복사</button></div>
   </div>`);
@@ -1078,7 +1086,7 @@ document.addEventListener('click', (e) => {
   const cp = t.closest('[data-copy]');
   if (cp) { copy(cp.dataset.copy); return; }
   const big = t.closest('[data-big]');
-  if (big) { bigSheet(big.dataset.big, big.dataset.bigSub); return; }
+  if (big) { bigSheet(big.dataset.big, big.dataset.bigSub, big.dataset.bigLang); return; }
   if (t.closest('[data-credits]')) { creditsSheet(); return; }
   const stop = t.closest('.stop[data-focus]');
   if (stop) { Haptic.select(); focusEventAt(stop.dataset.focus); return; }

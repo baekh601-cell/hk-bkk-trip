@@ -643,8 +643,14 @@ html, body { overflow-x: clip; }
 .sub-h:first-child { margin-top: 0; }
 
 .phrase { border-radius: var(--r-md); padding: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
-.phrase .en { font-size: 15.5px; font-weight: 700; line-height: 1.45; }
-.phrase .ko { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.lang-tag { display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; color: var(--city, var(--hk)); margin-bottom: 6px; }
+.phrase .local { font-size: 18px; font-weight: 800; line-height: 1.5; }
+.phrase .local:lang(th) { font-family: "Noto Sans Thai", "Leelawadee UI", "Thonburi", var(--font); line-height: 1.7; }
+.phrase .local:lang(zh-HK) { font-family: "Noto Sans HK", "PingFang HK", "Microsoft JhengHei", var(--font); }
+.phrase .en { font-size: 13.5px; font-weight: 600; line-height: 1.45; color: var(--ink-2); margin-top: 8px; }
+.phrase .ko { font-size: 13px; color: var(--muted); margin-top: 4px; }
+#sheetTitle:lang(th) { font-family: "Noto Sans Thai", "Leelawadee UI", "Thonburi", var(--font); line-height: 1.6; }
+#sheetTitle:lang(zh-HK) { font-family: "Noto Sans HK", "PingFang HK", "Microsoft JhengHei", var(--font); }
 .phrase .row { display: flex; justify-content: flex-end; margin-top: 10px; }
 
 .links a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; font-size: 14px; font-weight: 600; border-top: 1px solid var(--line); }

@@ -1,5 +1,5 @@
 /* 오프라인에서도 일정을 볼 수 있게 앱 파일과 사진을 캐시해요. */
-const VERSION = 'hkbkk-v2';
+const VERSION = 'hkbkk-v3';
 const SHELL = [
   './',
   './index.html',
@@ -14,7 +14,10 @@ const SHELL = [
 const RUNTIME = `${VERSION}-runtime`;
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // 한 파일이 실패해도(예: 안드로이드 앱의 폴더 주소) 나머지는 저장해요
+  e.waitUntil(caches.open(VERSION)
+    .then((c) => Promise.allSettled(SHELL.map((u) => c.add(u))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
