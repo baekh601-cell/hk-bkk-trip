@@ -1,5 +1,5 @@
 /* 오프라인에서도 일정을 볼 수 있게 앱 파일과 사진을 캐시해요. */
-const VERSION = 'hkbkk-v5';
+const VERSION = 'hkbkk-v7';
 const SHELL = [
   './',
   './index.html',
