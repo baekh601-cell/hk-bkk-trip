@@ -698,8 +698,8 @@ function renderDay(n) {
               <div><p class="eyebrow">Timeline</p><h2 style="font-size:24px;font-weight:800;margin-top:2px">오늘의 여정</h2><p style="font-size:13px;color:var(--muted);margin-top:2px">${evs.length}개 일정 · ${esc(d.tzNote)}</p></div>
               ${hasBranch ? `<div class="seg" role="group" aria-label="분기 선택">
                 <button type="button" data-branch="all" aria-pressed="${branchFilter === 'all'}">모두</button>
-                <button type="button" data-branch="swim" aria-pressed="${branchFilter === 'swim'}">수영</button>
-                <button type="button" data-branch="dry" aria-pressed="${branchFilter === 'dry'}">비수영·야경</button></div>` : ''}
+                <button type="button" data-branch="swim" aria-pressed="${branchFilter === 'swim'}">호텔 저녁</button>
+                <button type="button" data-branch="dry" aria-pressed="${branchFilter === 'dry'}">루프탑</button></div>` : ''}
             </div>
             ${periods}
           </div>
