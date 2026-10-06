@@ -1,5 +1,5 @@
 /* 오프라인에서도 일정을 볼 수 있게 앱 파일과 사진을 캐시해요. */
-const VERSION = 'hkbkk-v9';
+const VERSION = 'hkbkk-v10';
 const SHELL = [
   './',
   './index.html',
@@ -33,10 +33,10 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // 앱 파일: 네트워크 우선, 실패하면 캐시
+  // 앱 파일: 네트워크 우선(브라우저 캐시도 건너뛰어 항상 최신), 실패하면 캐시
   if (url.origin === self.location.origin) {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: 'no-store', credentials: 'same-origin' })
         .then((res) => {
           if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
           return res;

@@ -894,6 +894,8 @@ function renderTools() {
           <button class="btn small" type="button" data-install-btn>추가</button></div>
         ${window.TRIP_LOCK ? `<div class="row-between" style="margin-top:16px"><span><b style="display:block">이 기기에서 잠그기</b><span style="font-size:13px;color:var(--muted)">다음에 열 때 비밀번호를 다시 물어봐요</span></span>
           <button class="btn small ghost" type="button" data-lock>잠그기</button></div>` : ''}
+        <div class="row-between" style="margin-top:16px"><span><b style="display:block">일정 버전</b><span style="font-size:13px;color:var(--muted)" data-ver>확인 중…</span></span>
+          <button class="btn small ghost" type="button" data-refresh>최신으로</button></div>
       </div>
 
       <div class="card reveal" style="--d:.06s">
@@ -907,6 +909,19 @@ function renderTools() {
 }
 
 function setupTools() {
+  // 지금 보고 있는 일정이 언제 만든 것인지 보여주고, 저장된 파일을 비워 최신 일정을 다시 받을 수 있게 해요
+  const ver = $('[data-ver]');
+  fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+    if (!ver) return;
+    ver.textContent = v ? `${new Date(v.built).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 업데이트 · ${v.v.slice(0, 6)}` : '버전 정보 없음';
+  }).catch(() => { if (ver) ver.textContent = '오프라인이라 확인할 수 없어요'; });
+  $('[data-refresh]')?.addEventListener('click', async () => {
+    try {
+      if ('caches' in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
+      if (navigator.serviceWorker) await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister()));
+    } catch { /* 지울 게 없으면 그대로 새로고침 */ }
+    location.reload();
+  });
   let cur = 'hkd';
   const input = $('#amount');
   const out = $('#krw');
