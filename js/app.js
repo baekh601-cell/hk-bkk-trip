@@ -703,6 +703,17 @@ function renderDay(n) {
             </div>
             ${periods}
           </div>
+          ${d.alts?.length ? `<div class="card reveal">
+            <div class="card-title">${icon('swap')}<h3>이럴 땐 여기로</h3></div>
+            <p style="font-size:14px;color:var(--muted);margin:-4px 0 6px">계획이 틀어지거나 시간이 남을 때 들르기 좋은 곳이에요. 가족 지도와 영상 추천 중 동선에 가까운 곳만 골랐어요</p>
+            <ul class="alts">${d.alts.map((a) => `<li class="alt">
+              <span class="tag-s status">${esc(a.when)}</span>
+              <h4>${esc(a.t)}</h4>
+              <p>${esc(a.d)}</p>
+              ${a.n ? `<p class="alt-meta">${esc(a.n)}</p>` : ''}
+              ${a.map ? `<a class="btn small ghost" href="${mapUrl(a.map)}" target="_blank" rel="noopener">${icon('pin')} 지도에서 보기</a>` : ''}
+            </li>`).join('')}</ul>
+          </div>` : ''}
         </div>
 
         <aside class="side" aria-label="숙소와 하루 준비">
