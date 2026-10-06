@@ -106,15 +106,16 @@ function parse(hash) {
   }
   if (parts[0] === 'stay') return { page: 'stay' };
   if (parts[0] === 'tools') return { page: 'tools' };
+  if (parts[0] === 'places') return { page: 'places', city: ['hk', 'bkk'].includes(parts[1]) ? parts[1] : null };
   return { page: 'home' };
 }
-const rank = (r) => ({ home: 0, day: 1 + r.n / 10, stay: 2, tools: 3 }[r.page]);
+const rank = (r) => ({ home: 0, day: 1 + r.n / 10, places: 1.95, stay: 2, tools: 3 }[r.page]);
 
 function onRoute() {
   const next = parse(location.hash);
   if (next.fix) { history.replaceState(null, '', `#/day/${next.n}`); }
   const prev = route;
-  if (prev && prev.page === next.page && prev.n === next.n) return;
+  if (prev && prev.page === next.page && prev.n === next.n && prev.city === next.city) return;
   closeSheet(true);
 
   let dir = 'fade';
@@ -171,6 +172,7 @@ function render(r) {
   if (r.page === 'home') view.innerHTML = renderHome();
   else if (r.page === 'day') view.innerHTML = renderDay(r.n);
   else if (r.page === 'stay') view.innerHTML = renderStay();
+  else if (r.page === 'places') view.innerHTML = renderPlaces(r);
   else view.innerHTML = renderTools();
   updateChrome(r);
 }
@@ -179,6 +181,7 @@ function afterRender(r) {
   settleImages(view);
   observeReveal();
   if (r.page === 'home') { setupBoard(); animateCounters(); }
+  if (r.page === 'places') setupPlaces();
   if (r.page === 'day') {
     if (pendingFocus) { const t = pendingFocus; pendingFocus = null; requestAnimationFrame(() => focusEventAt(t)); }
     prefetchNeighbors(r.n);
@@ -202,6 +205,7 @@ function buildRail() {
     <div class="rail-h">일정 · 7박 8일</div>
     ${dayLinks}
     <div class="rail-h">안내</div>
+    <a href="#/places" data-rail="places">${icon('pin')}<span>대안 장소</span></a>
     <a href="#/stay" data-rail="stay">${icon('bed')}<span>숙소·항공</span></a>
     <a href="#/tools" data-rail="tools">${icon('tools')}<span>여행 도구</span></a>`;
 }
@@ -218,7 +222,7 @@ function updateChrome(r) {
   $$('[data-rail]').forEach((a) => (a.dataset.rail === railKey ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
 
   const t = $('#topbarTitle');
-  const titles = { home: '', stay: '숙소·항공', tools: '여행 도구' };
+  const titles = { home: '', stay: '숙소·항공', tools: '여행 도구', places: '대안 장소' };
   const text = r.page === 'day' ? `${r.n}일차 · ${DAYS[r.n - 1].title}` : titles[r.page];
   t.textContent = text;
   t.classList.toggle('has-text', !!text);
@@ -713,6 +717,7 @@ function renderDay(n) {
               ${a.n ? `<p class="alt-meta">${esc(a.n)}</p>` : ''}
               ${a.map ? `<a class="btn small ghost" href="${mapUrl(a.map)}" target="_blank" rel="noopener">${icon('pin')} 지도에서 보기</a>` : ''}
             </li>`).join('')}</ul>
+            ${d.city === 'hk' || d.city === 'bkk' ? `<a class="more-link" href="#/places/${d.city}">${d.city === 'hk' ? '홍콩' : '방콕'} 대안 장소 전체 보기 ${icon('right')}</a>` : ''}
           </div>` : ''}
         </div>
 
@@ -848,6 +853,140 @@ function renderStay() {
     <section class="section"><div class="section-head"><h2>호텔</h2><p>홍콩 3박 · 방콕 3박</p></div><div class="hotel-list">${hotels}</div></section>
     ${footerHTML()}
   </div>`;
+}
+
+/* ==========================================================================
+   대안 장소 (가족 지도)
+   ========================================================================== */
+const PLACE_GROUPS = {
+  hk: [
+    ['lantau', '퉁청·란타우', '10/7 숙소 근처', 2],
+    ['central', '센트럴·셩완', '10/9 오후 동선', 4],
+    ['kowloon', '침사추이·조던·서구룡', '10/9 동선', 4],
+    ['far', '동선 밖', '일부러 찾아가야 하는 곳', 0],
+  ],
+  bkk: [
+    ['airport', '수완나품 공항', '10/10 도착 · 10/13 출국', 5],
+    ['sukhumvit', '수쿰윗·아속·프롬퐁·통로', '10/10–12 숙소 근처', 5],
+    ['river', '왓포·아이콘시암 강가', '10/11 오전 동선', 6],
+    ['center', '프라투남·칫롬·시암·룸피니', '10/12 동선', 7],
+    ['silom', '실롬·수라웡·방락', '10/12 저녁 쏨분 근처', 7],
+    ['far', '동선 밖', '일부러 찾아가야 하는 곳', 0],
+  ],
+};
+const PLACE_KINDS = { all: '전체', food: '식사', cafe: '카페·디저트', sight: '구경·쉼', money: '현금·환전' };
+let placeCity = store.get('pcity', 'hk');
+let placeKind = 'all';
+let placeQuery = '';
+const placeTitle = (p) => p.ko || p.en;
+const placeGroup = (p) => PLACE_GROUPS[p.city].find((g) => g[0] === p.g);
+
+function placeMatches(p) {
+  if (p.city !== placeCity) return false;
+  if (placeKind !== 'all' && p.k !== placeKind) return false;
+  if (!placeQuery) return true;
+  const q = placeQuery.toLowerCase();
+  return [p.ko, p.en, p.menu, p.cat, p.addr].some((x) => x && x.toLowerCase().includes(q));
+}
+
+function placeRow(p) {
+  const line = p.menu || p.extra || p.cat || '';
+  return `<li><button class="place-row pressable" type="button" data-place="${p.id}">
+    <span class="pr-main"><strong>${esc(placeTitle(p))}</strong>${p.ko && p.en ? `<small>${esc(p.en)}</small>` : ''}</span>
+    ${line ? `<span class="pr-line">${esc(line)}</span>` : ''}
+    <span class="pr-tags"><span class="tag-s">${PLACE_KINDS[p.k]}</span>${p.st ? `<span class="tag-s status">가족 지도 · ${esc(p.st)}</span>` : ''}${p.by ? `<span class="tag-s">${esc(p.by)} 추천</span>` : ''}</span>
+    ${icon('right')}
+  </button></li>`;
+}
+
+function placeListHTML() {
+  const list = TRIP.places.filter(placeMatches);
+  if (!list.length) return `<p class="empty">조건에 맞는 곳이 없어요. 다른 종류를 고르거나 검색어를 지워 보세요.</p>`;
+  return PLACE_GROUPS[placeCity].map(([key, name, sub]) => {
+    const items = list.filter((p) => p.g === key);
+    if (!items.length) return '';
+    const head = `<span class="pg-name">${esc(name)}</span><span class="pg-sub">${esc(sub)} · ${items.length}곳</span>`;
+    const body = `<ul class="place-list">${items.map(placeRow).join('')}</ul>`;
+    return key === 'far'
+      ? `<details class="place-group far" ${placeQuery ? 'open' : ''}><summary>${head}${icon('right')}</summary>${body}</details>`
+      : `<section class="place-group"><h2>${head}</h2>${body}</section>`;
+  }).join('');
+}
+
+function placeFiltersHTML() {
+  const inCity = TRIP.places.filter((p) => p.city === placeCity);
+  const count = (k) => (k === 'all' ? inCity.length : inCity.filter((p) => p.k === k).length);
+  return Object.entries(PLACE_KINDS).filter(([k]) => count(k) > 0)
+    .map(([k, label]) => `<button class="filter" type="button" data-pkind="${k}" aria-pressed="${placeKind === k}">${label}<span class="n">${count(k)}</span></button>`).join('');
+}
+
+function renderPlaces(r) {
+  if (r.city) { placeCity = r.city; store.set('pcity', placeCity); }
+  const n = (c) => TRIP.places.filter((p) => p.city === c).length;
+  return `<div class="wrap">
+    <header class="page-head reveal"><p class="eyebrow">Family map</p><h1>대안 <em>장소</em></h1><p>가족 지도에 저장했지만 일정에는 없는 곳이에요. 동선과 가까운 순서로 묶었어요. 누르면 추천 메뉴와 출처를 볼 수 있어요.</p></header>
+    <div class="section places-tools">
+      <div class="seg" role="group" aria-label="도시">
+        <button type="button" data-pcity="hk" aria-pressed="${placeCity === 'hk'}">홍콩 ${n('hk')}</button>
+        <button type="button" data-pcity="bkk" aria-pressed="${placeCity === 'bkk'}">방콕 ${n('bkk')}</button>
+      </div>
+      <label class="place-search">${icon('search')}<input type="search" placeholder="이름이나 메뉴로 찾기" aria-label="이름이나 메뉴로 찾기" value="${esc(placeQuery)}" data-pq></label>
+      <div class="filters" role="group" aria-label="종류" data-pkinds>${placeFiltersHTML()}</div>
+    </div>
+    <div class="section" id="placeList">${placeListHTML()}</div>
+    ${footerHTML()}
+  </div>`;
+}
+
+function refreshPlaces(full = false) {
+  if (full) { const f = $('[data-pkinds]', view); if (f) f.innerHTML = placeFiltersHTML(); }
+  const el = $('#placeList', view);
+  if (el) el.innerHTML = placeListHTML();
+}
+
+function setupPlaces() {
+  const q = $('[data-pq]', view);
+  q?.addEventListener('input', () => { placeQuery = q.value.trim(); refreshPlaces(); });
+}
+
+function ytAt(url, at) {
+  if (!url || !at || !/youtube\.com\/watch/.test(url)) return url;
+  const m = at.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (!m) return url;
+  const sec = m[3] ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
+  return `${url}&t=${sec}s`;
+}
+
+function placeSheet(id) {
+  const p = TRIP.places.find((x) => x.id === id);
+  if (!p) return;
+  const g = placeGroup(p);
+  const city = CITY[p.city].label;
+  const mapQ = p.ll || [p.en || p.ko, p.addr].filter(Boolean).join(' ');
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+  const sec = (label, text) => (text ? `<div class="sheet-sec"><p class="sub-h">${label}</p><p>${esc(text)}</p></div>` : '');
+  openSheet(`<div style="height:30px"></div>
+    <div class="sheet-head">
+      <p style="font-size:12.5px;color:var(--muted);font-weight:700">${esc(city)} · ${esc(g[1])} · ${esc(g[2])}</p>
+      <h2 id="sheetTitle" style="margin-top:8px">${esc(placeTitle(p))}</h2>
+      ${p.ko && p.en ? `<p style="font-size:14px;color:var(--muted);margin-top:2px">${esc(p.en)}</p>` : ''}
+      <div class="ev-tags"><span class="tag-s">${PLACE_KINDS[p.k]}</span>${p.cat && !p.cat.startsWith('영상') && p.cat !== PLACE_KINDS[p.k] ? `<span class="tag-s">${esc(p.cat)}</span>` : ''}${p.st ? `<span class="tag-s status">가족 지도 · ${esc(p.st)}</span>` : ''}</div>
+    </div>
+    ${sec('추천 메뉴', p.menu)}
+    ${sec('영상 속 평가', p.review)}
+    ${sec('알아둘 점', p.note)}
+    ${sec('메모', p.extra)}
+    ${p.addr ? `<div class="sheet-sec"><p class="sub-h">주소</p><p>${esc(p.addr)}</p><div class="row" style="margin-top:8px"><button class="btn small ghost" type="button" data-copy="${esc(p.addr)}">${icon('copy')} 주소 복사</button></div></div>` : ''}
+    ${p.video || p.src ? `<div class="sheet-sec"><p class="sub-h">출처</p><div class="links">
+      ${p.video ? `<a href="${esc(ytAt(p.video, p.at))}" target="_blank" rel="noopener">${esc(p.by ? `${p.by} 영상` : '추천 영상')}${p.at ? ` · ${esc(p.at)}부터` : ''}${icon('ext')}</a>` : ''}
+      ${(p.src || []).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">확인 자료 · ${esc(host(u))}${icon('ext')}</a>`).join('')}
+    </div></div>` : ''}
+    <div class="sheet-sec actions">
+      <a class="btn" href="${mapUrl(mapQ)}" target="_blank" rel="noopener">${icon('pin')} 지도에서 보기</a>
+      <button class="btn ghost" type="button" data-copy="${esc(p.en || p.ko)}">${icon('copy')} 이름 복사</button>
+      ${g[3] ? `<a class="btn ghost" href="#/day/${g[3]}">${icon('cal')} ${g[3]}일차 일정 보기</a>` : ''}
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:4px">가족 지도와 영상 내용을 옮긴 정보예요. 영업시간과 가격은 가기 전에 한 번 더 확인해요.</p>`);
 }
 
 /* ==========================================================================
@@ -1166,6 +1305,26 @@ document.addEventListener('click', (e) => {
     ck.classList.toggle('is-done', on);
     ck.setAttribute('aria-pressed', String(on));
     if (on) Haptic.success(); else Haptic.tap();
+    return;
+  }
+  const pl = t.closest('[data-place]');
+  if (pl) { Haptic.tap(); placeSheet(pl.dataset.place); return; }
+  const pc = t.closest('[data-pcity]');
+  if (pc) {
+    Haptic.select();
+    placeCity = pc.dataset.pcity; placeKind = 'all'; store.set('pcity', placeCity);
+    $$('[data-pcity]', view).forEach((x) => x.setAttribute('aria-pressed', String(x === pc)));
+    history.replaceState(null, '', `#/places/${placeCity}`);
+    if (route) route.city = placeCity;
+    refreshPlaces(true);
+    return;
+  }
+  const pk = t.closest('[data-pkind]');
+  if (pk) {
+    Haptic.select();
+    placeKind = pk.dataset.pkind;
+    $$('[data-pkind]', view).forEach((x) => x.setAttribute('aria-pressed', String(x === pk)));
+    refreshPlaces();
     return;
   }
   const br = t.closest('[data-branch]');
